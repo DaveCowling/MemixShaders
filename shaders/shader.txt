@@ -1,0 +1,79 @@
+// All the smart stuff here is based on the pseudo bitmap to ASCII fragment shader by movAX13h
+// Original shader here: https://www.shadertoy.com/view/lssGDj
+// Tool for new characters: thrill-project.com/archiv/coding/bitmap/
+
+float character(int n, vec2 p)
+{
+	p = floor(p * vec2(4.0, 4.0) + 2.5);
+	if (clamp(p.x, 0.0, 4.0) == p.x)
+	{
+		if (clamp(p.y, 0.0, 4.0) == p.y)	
+		{
+			int a = int(round(p.x) + 5.0 * round(p.y));
+			if (((n >> a) & 1) == 1) return 1.0;
+		}	
+	}
+	return 0.0;
+}
+
+
+// This function computes the UV coords needed for fetching colors from iChannel0.
+// Give it a pair of normalized coordinates in 0.0 to 1.0 and get the UVs you need
+// to use in your texture() call for the shader to work well with different cams.
+vec2 getUV(in vec2 p)
+{
+	return vec2(0.5 + (p.x - 0.5) * iResolution.z, 1.0 - p.y);
+}
+
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord)
+{
+	vec2 pix = vec2(fragCoord.x, fragCoord.y);
+	vec2 normalizedPix = floor(pix / 8.0) * 8.0 / iResolution.xy;
+	vec2 adjustedNormalizedPix = getUV(normalizedPix);
+
+	vec3 col = texture(iChannel0, adjustedNormalizedPix).rgb;	
+	
+	float lum = 0.299 * col.r + 0.587 * col.g + 0.114 * col.b;
+
+	// Adjust sampled luminance via slider 0
+	lum = lum * iParam[0] * 2.0;
+	
+	// Character bitmaps (5x5) are defined by a 25 bit value, with LSB representing bottom right pixel
+	// and MSB representing top left pixel
+	// Handy tool from movAX13h here: http://thrill-project.com/archiv/coding/bitmap/
+	int n = 0;								//   (0 pixels)
+	if (lum > (1.0 / 20.0)) n = 4;			// . (1 pixel)
+	if (lum > (2.0 / 20.0)) n = 131200;		// : (2 pixels)
+	if (lum > (3.0 / 20.0)) n = 131208;		// ; (3 pixels)
+	if (lum > (4.0 / 20.0)) n = 4198532;	// i (4 pixels)
+	if (lum > (5.0 / 20.0)) n = 1118480;	// / (5 pixels)
+	if (lum > (6.0 / 20.0)) n = 12882;		// n (6 pixels)
+	if (lum > (7.0 / 20.0)) n = 145542;		// t (7 pixels)
+	if (lum > (8.0 / 20.0)) n = 6436996;	// f (8 pixels)
+	if (lum > (9.0 / 20.0)) n = 276782;		// b (9 pixels)
+	if (lum > (10.0 / 20.0)) n = 1016800;	// = (10 pixels)
+	if (lum > (11.0 / 20.0)) n = 18444881;	// K (11 pixels)
+	if (lum > (12.0 / 20.0)) n = 33061392;	// F (12 pixels)
+	if (lum > (13.0 / 20.0)) n = 15252014;	// 8 (13 pixels)
+	if (lum > (14.0 / 20.0)) n = 22730410;	// W (14 pixels)
+	if (lum > (15.0 / 20.0)) n = 15324974;	// 0 (15 pixels)
+	if (lum > (16.0 / 20.0)) n = 11512810;	// # (16 pixels)
+	if (lum > (17.0 / 20.0)) n = 33062431;	// E (17 pixels)
+//	if (lum > (18.0 / 20.0)) n = ;			// There doesn't appear to be a character with 18 pixels :(
+	if (lum > (19.0 / 20.0)) n = 33193151;	// $ (19 pixels)
+	
+	vec2 p = mod(pix / 4.0, 2.0) - vec2(1.0);
+    
+	vec3 greenBright	= vec3(0.3, 1.0, 0.2);
+	vec3 greenModified	= greenBright * lum;
+
+	// Adjust how much brightness impacts the character rendering itself with slider 1
+	// (So all the way to right is the most 'pure' ASCII art representation where luminance is conveyed
+	// purely by the density of the character)
+	vec3 greenActual	= mix(greenModified, greenBright, iParam[1]);
+
+	col					= greenActual * vec3(character(n, p));
+	
+	fragColor = vec4(col, 1.0);
+}
